@@ -56,7 +56,7 @@ PATIENCE = 10
 MIN_DELTA = 1e-4
 SCHEDULER_FACTOR = 0.5
 SCHEDULER_PATIENCE = 3
-ACTIVATION = "gelu"
+ACTIVATION = "relu"
 
 
 def resolve_device(device_name, cuda_id):
