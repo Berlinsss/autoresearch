@@ -167,7 +167,7 @@ def resolve_raw_data_root(explicit_root=None):
     candidate_paths = [
         explicit_root,
         os.environ.get("AUTORESEARCH_RAW_DATA_ROOT"),
-        "/Users/ph23568/Documents/UoB/Trem2/ExtractedFeatures",
+        # "/Users/ph23568/Documents/UoB/Trem2/ExtractedFeatures",
         "/home/b35am/berlin.b35am/Trem2/Data/ExtractedFeatures",
     ]
     for path in candidate_paths:

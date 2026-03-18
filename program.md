@@ -6,7 +6,7 @@ This repository now runs autonomous research for a single-cell classification pi
 
 To set up a new experiment, work with the user to:
 
-1. Agree on a run tag based on today's date. The branch `autoresearch/<tag>` must not already exist.
+1. Agree on a run tag based on today's date and time. The branch `autoresearch/<tag>` must not already exist.
 2. Create the branch from the current mainline: `git checkout -b autoresearch/<tag>`.
 3. Read the in-scope files for context:
    - `README.md` for the original project context.
@@ -32,6 +32,8 @@ During the experiment loop:
 - Do not write cache files outside `./data/data_cache`.
 - Do not write result files outside `./results/`.
 - Always activate the `trem2` conda environment before running `prepare.py` or `train.py`.
+- Run `python train.py` outside the sandbox with explicit user approval because GPU access is not available in the default sandboxed execution environment.
+- When requesting approval for `python train.py`, prefer a persistent approval rule for the exact command prefix `python train.py` so later experiment runs still require user-granted approval but do not prompt on every iteration.
 - Preserve the current sampling strategy from `prepare.py` unless the human explicitly asks to change it.
 - Preserve checkpoint selection by `val_loss` unless the human explicitly asks to change it.
 
@@ -70,7 +72,7 @@ best_val_acc:      0.912345
 You can extract the key lines with:
 
 ```bash
-source "$HOME/miniconda3/etc/profile.d/conda.sh"
+source "/home/b35am/berlin.b35am/miniforge3_macs/bin/activate"
 conda activate trem2
 python train.py > run.log 2>&1
 grep "^val_acc:\|^val_loss:\|^peak_vram_mb:" run.log

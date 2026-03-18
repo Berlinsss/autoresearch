@@ -8,8 +8,18 @@ Usage:
 import argparse
 import logging
 import os
+import shutil
+import subprocess
+import sys
 import time
 from datetime import datetime
+
+# Keep Matplotlib config/cache inside the repo so sandboxed runs do not
+# depend on a writable home-directory config path.
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+MPLCONFIGDIR = os.path.join(PROJECT_ROOT, ".cache", "matplotlib")
+os.makedirs(MPLCONFIGDIR, exist_ok=True)
+os.environ.setdefault("MPLCONFIGDIR", MPLCONFIGDIR)
 
 import matplotlib
 
@@ -26,7 +36,6 @@ from torch.utils.data import DataLoader, TensorDataset
 # Project-local paths
 # ---------------------------------------------------------------------------
 
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 CACHE_PATH = os.path.join(PROJECT_ROOT, "data", "data_cache", "dataset.pt")
 RESULTS_DIR = os.path.join(PROJECT_ROOT, "results")
 
@@ -84,6 +93,37 @@ def build_logger(run_dir):
     logger.addHandler(file_handler)
     logger.addHandler(stream_handler)
     return logger
+
+
+def log_runtime_diagnostics(logger, requested_device, cuda_id):
+    logger.info("Python executable: %s", sys.executable)
+    logger.info("Conda env: %s", os.environ.get("CONDA_DEFAULT_ENV", "<unset>"))
+    logger.info("Requested device: %s (cuda_id=%s)", requested_device, cuda_id)
+    logger.info("CUDA_VISIBLE_DEVICES=%s", os.environ.get("CUDA_VISIBLE_DEVICES", "<unset>"))
+    logger.info("NVIDIA_VISIBLE_DEVICES=%s", os.environ.get("NVIDIA_VISIBLE_DEVICES", "<unset>"))
+    logger.info("Torch version: %s", torch.__version__)
+    logger.info("Torch CUDA build: %s", torch.version.cuda)
+    logger.info("torch.cuda.is_available()=%s", torch.cuda.is_available())
+    logger.info("torch.cuda.device_count()=%s", torch.cuda.device_count())
+    logger.info("/dev/nvidia0 exists: %s", os.path.exists("/dev/nvidia0"))
+    logger.info("/dev/nvidiactl exists: %s", os.path.exists("/dev/nvidiactl"))
+
+    nvidia_smi_path = shutil.which("nvidia-smi")
+    logger.info("nvidia-smi path: %s", nvidia_smi_path or "<not found>")
+    if nvidia_smi_path:
+        try:
+            result = subprocess.run(
+                [nvidia_smi_path, "-L"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            stdout = result.stdout.strip() or "<empty>"
+            stderr = result.stderr.strip() or "<empty>"
+            logger.info("nvidia-smi -L exit_code=%s stdout=%s stderr=%s", result.returncode, stdout, stderr)
+        except Exception as exc:
+            logger.info("nvidia-smi probe failed: %s: %s", type(exc).__name__, exc)
 
 
 def build_loader(features, labels, batch_size, shuffle, pin_memory):
@@ -194,7 +234,7 @@ def main():
     parser.add_argument("--activation", choices=["tanh", "relu", "gelu", "silu"], default=ACTIVATION)
     parser.add_argument("--results_dir", type=str, default=RESULTS_DIR)
     parser.add_argument("--cache_path", type=str, default=CACHE_PATH)
-    parser.add_argument("--device", choices=["auto", "cpu", "cuda", "mps"], default="auto")
+    parser.add_argument("--device", choices=["auto", "cpu", "cuda", "mps"], default="cuda")
     parser.add_argument("--cuda_id", type=int, default=0)
     args = parser.parse_args()
 
@@ -215,6 +255,7 @@ def main():
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
+    log_runtime_diagnostics(logger, args.device, args.cuda_id)
     device = resolve_device(args.device, args.cuda_id)
     pin_memory = device.type == "cuda"
     dataset = torch.load(args.cache_path, map_location="cpu", weights_only=False)
