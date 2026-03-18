@@ -153,7 +153,12 @@ class MLP(nn.Module):
             layers.append(nn.Dropout(dropout))
             dim = hidden_dim
         self.encoder = nn.Sequential(*layers)
-        self.classifier = nn.Linear(dim, num_classes)
+        classifier_hidden_dim = max(dim // 2, num_classes)
+        self.classifier = nn.Sequential(
+            nn.Linear(dim, classifier_hidden_dim),
+            build_activation(activation),
+            nn.Linear(classifier_hidden_dim, num_classes),
+        )
 
     def forward(self, inputs):
         hidden = self.encoder(inputs)
