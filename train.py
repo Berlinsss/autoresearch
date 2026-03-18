@@ -44,7 +44,7 @@ RESULTS_DIR = os.path.join(PROJECT_ROOT, "results")
 # ---------------------------------------------------------------------------
 
 SEED = 42
-BATCH_SIZE_TRAIN = 128
+BATCH_SIZE_TRAIN = 256
 BATCH_SIZE_EVAL = 256
 HIDDEN_DIM = 128
 NUM_LAYERS = 4
