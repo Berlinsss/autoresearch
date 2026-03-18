@@ -57,6 +57,7 @@ MIN_DELTA = 1e-4
 SCHEDULER_FACTOR = 0.5
 SCHEDULER_PATIENCE = 3
 ACTIVATION = "relu"
+GRAD_CLIP_NORM = 1.0
 
 
 def resolve_device(device_name, cuda_id):
@@ -232,6 +233,7 @@ def main():
     parser.add_argument("--scheduler_factor", type=float, default=SCHEDULER_FACTOR)
     parser.add_argument("--scheduler_patience", type=int, default=SCHEDULER_PATIENCE)
     parser.add_argument("--activation", choices=["tanh", "relu", "gelu", "silu"], default=ACTIVATION)
+    parser.add_argument("--grad_clip_norm", type=float, default=GRAD_CLIP_NORM)
     parser.add_argument("--results_dir", type=str, default=RESULTS_DIR)
     parser.add_argument("--cache_path", type=str, default=CACHE_PATH)
     parser.add_argument("--device", choices=["auto", "cpu", "cuda", "mps"], default="cuda")
@@ -305,7 +307,7 @@ def main():
     logger.info(
         "Configs: seed=%s batchSizeTrain=%s batchSizeEval=%s hiddenDim=%s numLayers=%s dropout=%.4f "
         "numEpochs=%s lr=%.6f weightDecay=%.6f patience=%s minDelta=%.6f schedulerFactor=%.3f "
-        "schedulerPatience=%s activation=%s",
+        "schedulerPatience=%s activation=%s gradClipNorm=%.2f",
         args.seed,
         args.batch_size_train,
         args.batch_size_eval,
@@ -320,6 +322,7 @@ def main():
         args.scheduler_factor,
         args.scheduler_patience,
         args.activation,
+        args.grad_clip_norm,
     )
     logger.info("Model details: totalParams=%s trainableParams=%s", total_params, trainable_params)
 
@@ -349,6 +352,7 @@ def main():
             logits = model(features)
             loss = criterion(logits, labels)
             loss.backward()
+            nn.utils.clip_grad_norm_(model.parameters(), max_norm=args.grad_clip_norm)
             optimizer.step()
 
             train_loss += loss.item() * labels.size(0)
