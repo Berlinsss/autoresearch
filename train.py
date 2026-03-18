@@ -145,6 +145,10 @@ def build_activation(name):
 class MLP(nn.Module):
     def __init__(self, input_dim, hidden_dim, num_layers, num_classes, dropout, activation):
         super().__init__()
+        self.feature_mixer = nn.Sequential(
+            nn.Linear(input_dim, input_dim),
+            build_activation(activation),
+        )
         layers = []
         dim = input_dim
         for _ in range(num_layers):
@@ -156,6 +160,7 @@ class MLP(nn.Module):
         self.classifier = nn.Linear(dim, num_classes)
 
     def forward(self, inputs):
+        inputs = self.feature_mixer(inputs)
         hidden = self.encoder(inputs)
         return self.classifier(hidden)
 
