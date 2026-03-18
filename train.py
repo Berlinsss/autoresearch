@@ -57,6 +57,7 @@ MIN_DELTA = 1e-4
 SCHEDULER_FACTOR = 0.5
 SCHEDULER_PATIENCE = 3
 ACTIVATION = "relu"
+LABEL_SMOOTHING = 0.05
 
 
 def resolve_device(device_name, cuda_id):
@@ -232,6 +233,7 @@ def main():
     parser.add_argument("--scheduler_factor", type=float, default=SCHEDULER_FACTOR)
     parser.add_argument("--scheduler_patience", type=int, default=SCHEDULER_PATIENCE)
     parser.add_argument("--activation", choices=["tanh", "relu", "gelu", "silu"], default=ACTIVATION)
+    parser.add_argument("--label_smoothing", type=float, default=LABEL_SMOOTHING)
     parser.add_argument("--results_dir", type=str, default=RESULTS_DIR)
     parser.add_argument("--cache_path", type=str, default=CACHE_PATH)
     parser.add_argument("--device", choices=["auto", "cpu", "cuda", "mps"], default="cuda")
@@ -292,7 +294,7 @@ def main():
     total_params = sum(parameter.numel() for parameter in model.parameters())
     trainable_params = sum(parameter.numel() for parameter in model.parameters() if parameter.requires_grad)
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="min", factor=args.scheduler_factor, patience=args.scheduler_patience
@@ -305,7 +307,7 @@ def main():
     logger.info(
         "Configs: seed=%s batchSizeTrain=%s batchSizeEval=%s hiddenDim=%s numLayers=%s dropout=%.4f "
         "numEpochs=%s lr=%.6f weightDecay=%.6f patience=%s minDelta=%.6f schedulerFactor=%.3f "
-        "schedulerPatience=%s activation=%s",
+        "schedulerPatience=%s activation=%s labelSmoothing=%.4f",
         args.seed,
         args.batch_size_train,
         args.batch_size_eval,
@@ -320,6 +322,7 @@ def main():
         args.scheduler_factor,
         args.scheduler_patience,
         args.activation,
+        args.label_smoothing,
     )
     logger.info("Model details: totalParams=%s trainableParams=%s", total_params, trainable_params)
 
