@@ -149,6 +149,7 @@ class MLP(nn.Module):
         dim = input_dim
         for _ in range(num_layers):
             layers.append(nn.Linear(dim, hidden_dim))
+            layers.append(nn.LayerNorm(hidden_dim))
             layers.append(build_activation(activation))
             layers.append(nn.Dropout(dropout))
             dim = hidden_dim
