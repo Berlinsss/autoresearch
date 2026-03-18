@@ -147,11 +147,10 @@ class MLP(nn.Module):
         super().__init__()
         layers = []
         dim = input_dim
-        for layer_idx in range(num_layers):
+        for _ in range(num_layers):
             layers.append(nn.Linear(dim, hidden_dim))
             layers.append(build_activation(activation))
-            if layer_idx < num_layers - 1:
-                layers.append(nn.Dropout(dropout))
+            layers.append(nn.Dropout(dropout))
             dim = hidden_dim
         self.encoder = nn.Sequential(*layers)
         self.classifier = nn.Linear(dim, num_classes)
