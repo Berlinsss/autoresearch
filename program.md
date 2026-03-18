@@ -1,114 +1,124 @@
 # autoresearch
 
-This is an experiment to have the LLM do its own research.
+This repository now runs autonomous research for a single-cell classification pipeline.
 
 ## Setup
 
 To set up a new experiment, work with the user to:
 
-1. **Agree on a run tag**: propose a tag based on today's date (e.g. `mar5`). The branch `autoresearch/<tag>` must not already exist — this is a fresh run.
-2. **Create the branch**: `git checkout -b autoresearch/<tag>` from current master.
-3. **Read the in-scope files**: The repo is small. Read these files for full context:
-   - `README.md` — repository context.
-   - `prepare.py` — fixed constants, data prep, tokenizer, dataloader, evaluation. Do not modify.
-   - `train.py` — the file you modify. Model architecture, optimizer, training loop.
-4. **Verify data exists**: Check that `~/.cache/autoresearch/` contains data shards and a tokenizer. If not, tell the human to run `uv run prepare.py`.
-5. **Initialize results.tsv**: Create `results.tsv` with just the header row. The baseline will be recorded after the first run.
-6. **Confirm and go**: Confirm setup looks good.
+1. Agree on a run tag based on today's date. The branch `autoresearch/<tag>` must not already exist.
+2. Create the branch from the current mainline: `git checkout -b autoresearch/<tag>`.
+3. Read the in-scope files for context:
+   - `README.md` for the original project context.
+   - `prepare.py` for the fixed data preparation and caching protocol.
+   - `train.py` for the editable model and training loop.
+   - `program.md` for the experiment loop you are following.
+4. Use the `conda trem2` environment for all runs in this repository.
+5. Build the local cache once with `python prepare.py`. This writes only to `./data/data_cache`.
+6. Initialize `results.tsv` with the header row if it does not exist.
+7. Confirm the setup and start the baseline run.
 
-Once you get confirmation, kick off the experimentation.
+## Ground Rules
 
-## Experimentation
+The project now has two layers:
 
-Each experiment runs on a single GPU. The training script runs for a **fixed time budget of 5 minutes** (wall clock training time, excluding startup/compilation). You launch it simply as: `uv run train.py`.
+- `prepare.py` is the fixed data protocol. It reads the raw single-cell feature tables, applies the configured split, scaling, and resampling strategy, then writes the cache to `./data/data_cache`.
+- `train.py` is the research surface. It loads the cache, defines the MLP, trains it, reports `val_acc`, and writes per-run outputs under `./results/<run_id>/`.
 
-**What you CAN do:**
-- Modify `train.py` — this is the only file you edit. Everything is fair game: model architecture, optimizer, hyperparameters, training loop, batch size, model size, etc.
+During the experiment loop:
 
-**What you CANNOT do:**
-- Modify `prepare.py`. It is read-only. It contains the fixed evaluation, data loading, tokenizer, and training constants (time budget, sequence length, etc).
-- Install new packages or add dependencies. You can only use what's already in `pyproject.toml`.
-- Modify the evaluation harness. The `evaluate_bpb` function in `prepare.py` is the ground truth metric.
+- Do modify `train.py`.
+- Do not modify files outside this repository.
+- Do not write cache files outside `./data/data_cache`.
+- Do not write result files outside `./results/`.
+- Always activate the `trem2` conda environment before running `prepare.py` or `train.py`.
+- Preserve the current sampling strategy from `prepare.py` unless the human explicitly asks to change it.
+- Preserve checkpoint selection by `val_loss` unless the human explicitly asks to change it.
 
-**The goal is simple: get the lowest val_bpb.** Since the time budget is fixed, you don't need to worry about training time — it's always 5 minutes. Everything is fair game: change the architecture, the optimizer, the hyperparameters, the batch size, the model size. The only constraint is that the code runs without crashing and finishes within the time budget.
+## Objective
 
-**VRAM** is a soft constraint. Some increase is acceptable for meaningful val_bpb gains, but it should not blow up dramatically.
+The goal is to maximize `val_acc`.
 
-**Simplicity criterion**: All else being equal, simpler is better. A small improvement that adds ugly complexity is not worth it. Conversely, removing something and getting equal or better results is a great outcome — that's a simplification win. When evaluating whether to keep a change, weigh the complexity cost against the improvement magnitude. A 0.001 val_bpb improvement that adds 20 lines of hacky code? Probably not worth it. A 0.001 val_bpb improvement from deleting code? Definitely keep. An improvement of ~0 but much simpler code? Keep.
+Important nuance:
 
-**The first run**: Your very first run should always be to establish the baseline, so you will run the training script as is.
+- The selected checkpoint inside a run is still chosen by best `val_loss`.
+- The outer research loop compares experiments by the final reported `val_acc`.
 
-## Output format
+Higher `val_acc` is better. If two runs are effectively tied, prefer the simpler change or the one with lower `val_loss`.
 
-Once the script finishes it prints a summary like this:
+## Output Format
 
-```
+At the end of a successful run, `train.py` prints a summary block like:
+
+```text
 ---
-val_bpb:          0.997900
-training_seconds: 300.1
-total_seconds:    325.9
-peak_vram_mb:     45060.2
-mfu_percent:      39.80
-total_tokens_M:   499.6
-num_steps:        953
-num_params_M:     50.3
-depth:            8
+val_acc:           0.912345
+val_loss:          0.456789
+test_acc_sampled:  0.901234
+test_loss_sampled: 0.501234
+test_acc_original: 0.887654
+test_loss_original:0.534210
+training_seconds:  42.1
+total_seconds:     45.0
+peak_vram_mb:      512.4
+num_params:        69125
+best_epoch:        27
+best_val_loss:     0.456789
+best_val_acc:      0.912345
 ```
 
-Note that the script is configured to always stop after 5 minutes, so depending on the computing platform of this computer the numbers might look different. You can extract the key metric from the log file:
+You can extract the key lines with:
 
-```
-grep "^val_bpb:" run.log
-```
-
-## Logging results
-
-When an experiment is done, log it to `results.tsv` (tab-separated, NOT comma-separated — commas break in descriptions).
-
-The TSV has a header row and 5 columns:
-
-```
-commit	val_bpb	memory_gb	status	description
+```bash
+source "$HOME/miniconda3/etc/profile.d/conda.sh"
+conda activate trem2
+python train.py > run.log 2>&1
+grep "^val_acc:\|^val_loss:\|^peak_vram_mb:" run.log
 ```
 
-1. git commit hash (short, 7 chars)
-2. val_bpb achieved (e.g. 1.234567) — use 0.000000 for crashes
-3. peak memory in GB, round to .1f (e.g. 12.3 — divide peak_vram_mb by 1024) — use 0.0 for crashes
-4. status: `keep`, `discard`, or `crash`
-5. short text description of what this experiment tried
+## Logging Results
 
-Example:
+Log each experiment to `results.tsv` as tab-separated values with this header:
 
-```
-commit	val_bpb	memory_gb	status	description
-a1b2c3d	0.997900	44.0	keep	baseline
-b2c3d4e	0.993200	44.2	keep	increase LR to 0.04
-c3d4e5f	1.005000	44.0	discard	switch to GeLU activation
-d4e5f6g	0.000000	0.0	crash	double model width (OOM)
+```text
+commit	val_acc	val_loss	memory_gb	status	description
 ```
 
-## The experiment loop
+Where:
 
-The experiment runs on a dedicated branch (e.g. `autoresearch/mar5` or `autoresearch/mar5-gpu0`).
+1. `commit`: short git hash.
+2. `val_acc`: final reported validation accuracy. Use `0.000000` for crashes.
+3. `val_loss`: final reported validation loss. Use `999.000000` for crashes.
+4. `memory_gb`: peak memory in GB rounded to one decimal place. Use `0.0` for crashes.
+5. `status`: `keep`, `discard`, or `crash`.
+6. `description`: short description of what changed.
 
-LOOP FOREVER:
+## Baseline
 
-1. Look at the git state: the current branch/commit we're on
-2. Tune `train.py` with an experimental idea by directly hacking the code.
-3. git commit
-4. Run the experiment: `uv run train.py > run.log 2>&1` (redirect everything — do NOT use tee or let output flood your context)
-5. Read out the results: `grep "^val_bpb:\|^peak_vram_mb:" run.log`
-6. If the grep output is empty, the run crashed. Run `tail -n 50 run.log` to read the Python stack trace and attempt a fix. If you can't get things to work after more than a few attempts, give up.
-7. Record the results in the tsv (NOTE: do not commit the results.tsv file, leave it untracked by git)
-8. If val_bpb improved (lower), you "advance" the branch, keeping the git commit
-9. If val_bpb is equal or worse, you git reset back to where you started
+The first run must be the baseline: do not change `train.py` before running it once.
 
-The idea is that you are a completely autonomous researcher trying things out. If they work, keep. If they don't, discard. And you're advancing the branch so that you can iterate. If you feel like you're getting stuck in some way, you can rewind but you should probably do this very very sparingly (if ever).
+## Experiment Loop
 
-**Timeout**: Each experiment should take ~5 minutes total (+ a few seconds for startup and eval overhead). If a run exceeds 10 minutes, kill it and treat it as a failure (discard and revert).
+Loop forever:
 
-**Crashes**: If a run crashes (OOM, or a bug, or etc.), use your judgment: If it's something dumb and easy to fix (e.g. a typo, a missing import), fix it and re-run. If the idea itself is fundamentally broken, just skip it, log "crash" as the status in the tsv, and move on.
+1. Check the current branch and commit.
+2. Make one focused experimental change in `train.py`.
+3. Commit the change.
+4. Run the experiment with `python train.py > run.log 2>&1` inside the `conda trem2` environment.
+5. Extract `val_acc`, `val_loss`, and `peak_vram_mb` from `run.log`.
+6. If the summary block is missing, inspect the failure with `tail -n 50 run.log`, log the crash, and decide whether the idea is worth fixing.
+7. Record the run in `results.tsv`.
+8. If `val_acc` improved, keep the commit and continue from there.
+9. If `val_acc` is worse, revert to the previous good commit.
 
-**NEVER STOP**: Once the experiment loop has begun (after the initial setup), do NOT pause to ask the human if you should continue. Do NOT ask "should I keep going?" or "is this a good stopping point?". The human might be asleep, or gone from a computer and expects you to continue working *indefinitely* until you are manually stopped. You are autonomous. If you run out of ideas, think harder — read papers referenced in the code, re-read the in-scope files for new angles, try combining previous near-misses, try more radical architectural changes. The loop runs until the human interrupts you, period.
+## Research Heuristics
 
-As an example use case, a user might leave you running while they sleep. If each experiment takes you ~5 minutes then you can run approx 12/hour, for a total of about 100 over the duration of the average human sleep. The user then wakes up to experimental results, all completed by you while they slept!
+- Favor small, reviewable changes.
+- Start with hyperparameters before larger architectural changes.
+- Treat training time as a soft cost: big runtime increases need a clear `val_acc` gain to justify them.
+- Prefer simpler code when performance is similar.
+- Keep the pipeline reproducible and comparable across runs.
+
+## Never Stop
+
+Once the loop has started, do not pause to ask whether to continue. Keep running experiments until the human interrupts you.
