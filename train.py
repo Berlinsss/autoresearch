@@ -44,19 +44,19 @@ RESULTS_DIR = os.path.join(PROJECT_ROOT, "results")
 # ---------------------------------------------------------------------------
 
 SEED = 42
-BATCH_SIZE_TRAIN = 256
+BATCH_SIZE_TRAIN = 128
 BATCH_SIZE_EVAL = 256
 HIDDEN_DIM = 128
 NUM_LAYERS = 4
-DROPOUT = 0.25
+DROPOUT = 0.15
 NUM_EPOCHS = 300
-LEARNING_RATE = 3e-4
+LEARNING_RATE = 1e-3
 WEIGHT_DECAY = 1e-4
 PATIENCE = 10
 MIN_DELTA = 1e-4
 SCHEDULER_FACTOR = 0.5
 SCHEDULER_PATIENCE = 3
-ACTIVATION = "relu"
+ACTIVATION = "tanh"
 
 
 def resolve_device(device_name, cuda_id):
