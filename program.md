@@ -6,7 +6,7 @@ This repository now runs autonomous research for a single-cell classification pi
 
 To set up a new experiment, work with the user to:
 
-1. Agree on a run tag based on today's date and time. The branch `autoresearch/<tag>` must not already exist.
+1. Agree on a run tag based on today's date. The branch `autoresearch/<tag>` must not already exist.
 2. Create the branch from the current mainline: `git checkout -b autoresearch/<tag>`.
 3. Read the in-scope files for context:
    - `README.md` for the original project context.
@@ -17,6 +17,7 @@ To set up a new experiment, work with the user to:
 5. Build the local cache once with `python prepare.py`. This writes only to `./data/data_cache`.
 6. Initialize `results.tsv` with the header row if it does not exist.
 7. Confirm the setup and start the baseline run.
+8. Ask permison for run command in non-sanbox enviroment that starts with "git"
 
 ## Ground Rules
 
