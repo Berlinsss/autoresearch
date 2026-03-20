@@ -22,4 +22,5 @@ dev/
 # Results file
 results.tsv
 
-.data
+data
+.cache
